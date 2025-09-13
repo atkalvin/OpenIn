@@ -20,6 +20,7 @@
   <select id="platform">
     <option value="youtube">YouTube</option>
     <option value="tiktok">TikTok</option>
+    <option value="twitch">Twitch</option>
     <option value="spotify">Spotify</option>
   </select>
 
@@ -38,13 +39,17 @@ function normalizeUrl(input, platform) {
   // Autoriser juste un handle
   if (platform === 'youtube') {
     // youtube: on accepte @handle, handle, ou des URLs
-    if (s.startsWith('@')) s = 'https://youtube.com/' + s;
-    if (!s.includes('youtube.com')) s = 'https://youtube.com/@' + s.replace(/^@+/, '');
+    if (s.startsWith('@')) s = 'https://www.youtube.com/' + s;
+    if (!s.includes('youtube.com')) s = 'https://www.youtube.com/@' + s.replace(/^@+/, '');
   }
   if (platform === 'tiktok') {
     if (s.startsWith('@')) s = 'https://www.tiktok.com/' + s;
     if (!s.includes('tiktok.com')) s = 'https://www.tiktok.com/@' + s.replace(/^@+/, '');
   }
+  if (platform === 'twitch') {
+  if (s.startsWith('@')) s = 'https://www.twitch.tv/' + s.substring(1);
+  if (!s.includes('twitch.tv')) s = 'https://www.twitch.tv/' + s.replace(/^@+/, '');
+}
   if (platform === 'spotify') {
     // laisse l’utilisateur coller l’URL open.spotify.com/...
     if (!/^https?:\/\//i.test(s)) s = 'https://' + s;
@@ -64,33 +69,34 @@ function normalizeUrl(input, platform) {
 }
 
 function buildForYouTube(webUrl) {
-  // ex: https://youtube.com/@bastiui  -> app: youtube://www.youtube.com/@bastiui
-  const appUrl = webUrl.replace(/^https?:\/\//, 'youtube://');
+  const u = new URL(webUrl);
+  // Normaliser l'hôte pour maximiser la compatibilité iOS
+  u.hostname = 'www.youtube.com';
+  const normalizedWeb = u.toString();
+  const appUrl = 'youtube://' + u.hostname + u.pathname + (u.search || '');
   return {
-    webUrl,
+    webUrl: normalizedWeb,
     pkg: 'com.google.android.youtube',
-    // une seule candidate nécessaire côté iOS
     appCandidates: [appUrl],
   };
 }
 
 function buildForTikTok(webUrl) {
-  // Web fallback propre
   const url = new URL(webUrl);
   const parts = url.pathname.split('/').filter(Boolean);
-  // handle = @xxx ou xxx
   let handle = parts[0] || '';
   if (!handle.startsWith('@')) handle = '@' + handle;
+  const handleNoAt = handle.replace(/^@/, '');
 
-  // iOS : essayer plusieurs schémas historiques
   const iosCandidates = [
+    `tiktok://user?unique_id=${handleNoAt}`,
     `tiktok://user/${handle}`,
     `tiktok://profile/${handle}`,
-    `snssdk1128://user/profile/${handle}`, // anciens builds
+    `snssdk1128://user/profile/${handle}`,
   ];
 
   return {
-    webUrl,
+    webUrl: url.toString(),
     pkg: 'com.zhiliaoapp.musically',
     appCandidates: iosCandidates,
   };
@@ -107,6 +113,24 @@ function buildForSpotify(webUrl) {
   };
 }
 
+function buildForTwitch(webUrl) {
+  const url = new URL(webUrl);
+  const parts = url.pathname.split('/').filter(Boolean);
+  let handle = parts[0] || '';
+  if (handle.startsWith('@')) handle = handle.substring(1);
+
+  const iosCandidates = [
+    `twitch://stream/${handle}`,
+    `twitch://open?stream=${handle}`,
+  ];
+
+  return {
+    webUrl,
+    pkg: 'tv.twitch.android.app',
+    appCandidates: iosCandidates,
+  };
+}
+
 /* ------------------------ UI main ------------------------ */
 function generateLink() {
   const platform = document.getElementById('platform').value;
@@ -119,6 +143,7 @@ function generateLink() {
   if (platform === 'youtube') cfg = buildForYouTube(webUrl);
   else if (platform === 'tiktok') cfg = buildForTikTok(webUrl);
   else if (platform === 'spotify') cfg = buildForSpotify(webUrl);
+  else if (platform === 'twitch') cfg = buildForTwitch(webUrl);
   else { alert('Plateforme non gérée.'); return; }
 
   // Base vers ta page de redirection
