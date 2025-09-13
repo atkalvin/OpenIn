@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <title>OpenIn - Générateur de liens</title>
+  <style>
+    body { font-family: sans-serif; padding: 2rem; background: #f9fafb; }
+    h1 { color: #111; }
+    label { display: block; margin-top: 1rem; }
+    input, select { padding: 0.5rem; width: 100%; margin-top: 0.5rem; }
+    button { margin-top: 1.5rem; padding: 0.7rem 1.2rem; background: #2563eb; color: white; border: none; border-radius: 6px; }
+    #result { margin-top: 1.5rem; padding: 1rem; background: #e5e7eb; border-radius: 6px; word-break: break-word; }
+  </style>
+</head>
+<body>
+  <h1>OpenIn – Génère ton Smart Link</h1>
+  <p>Colle ton lien et obtiens une URL qui ouvre l’application.</p>
+
+  <label for="platform">Plateforme</label>
+  <select id="platform">
+    <option value="youtube">YouTube</option>
+    <option value="tiktok">TikTok</option>
+    <option value="spotify">Spotify</option>
+  </select>
+
+  <label for="url">Lien de ton profil / chaîne</label>
+  <input type="text" id="url" placeholder="ex: https://youtube.com/@bastiui" />
+
+  <button onclick="generateLink()">Générer</button>
+
+  <div id="result"></div>
+
+<script>
+function generateLink() {
+  const platform = document.getElementById('platform').value;
+  const rawUrl = document.getElementById('url').value.trim();
+  if (!rawUrl) { alert('Entre un lien valide'); return; }
+
+  let appUrl, webUrl, pkg;
+
+  if (platform === 'youtube') {
+    appUrl = rawUrl.replace('https://', 'youtube://');
+    webUrl = rawUrl;
+    pkg = 'com.google.android.youtube';
+  }
+  else if (platform === 'tiktok') {
+    appUrl = rawUrl.replace('https://', 'snssdk1128://');
+    webUrl = rawUrl;
+    pkg = 'com.zhiliaoapp.musically';
+  }
+  else if (platform === 'spotify') {
+    appUrl = rawUrl.replace('https://open.', 'spotify:').replace(/\//g, ':');
+    webUrl = rawUrl;
+    pkg = 'com.spotify.music';
+  }
+
+  const base = window.location.origin + window.location.pathname.replace('index.html', '') + 'open.html';
+  const link = `${base}?app=${encodeURIComponent(appUrl)}&web=${encodeURIComponent(webUrl)}&pkg=${pkg}`;
+  
+  document.getElementById('result').innerHTML = `<strong>Ton Smart Link :</strong><br><a href="${link}" target="_blank">${link}</a>`;
+}
+</script>
+</body>
+</html>
