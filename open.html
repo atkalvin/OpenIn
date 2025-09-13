@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ouverture de l’application…</title>
+  <style>
+    html,body{height:100%;margin:0;padding:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,"Helvetica Neue",Arial,"Noto Sans",sans-serif;background:#0b0c10;color:#e5e7eb}
+    .wrap{min-height:100%;display:flex;align-items:center;justify-content:center;padding:24px}
+    .card{max-width:560px;width:100%;background:#111827;padding:24px;border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+    h1{font-size:20px;margin:0 0 8px}
+    p{opacity:.9;line-height:1.5;margin:0 0 8px}
+    code{background:#0b0c10;padding:2px 6px;border-radius:6px}
+    .small{opacity:.6;font-size:12px;margin-top:8px}
+    .spinner{width:24px;height:24px;border:3px solid rgba(255,255,255,.25);border-top-color:#fff;border-radius:50%;animation:spin 1s linear infinite;margin-right:8px}
+    .row{display:flex;align-items:center}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    a.btn{display:inline-block;margin-top:12px;padding:10px 14px;border-radius:10px;background:#2563eb;color:#fff;text-decoration:none}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <div class="row">
+        <div class="spinner"></div>
+        <h1>On tente d’ouvrir l’application…</h1>
+      </div>
+      <p>Si rien ne se passe, tu seras redirigé vers la version web.</p>
+      <p class="small">Astuce : si une fenêtre demande l’autorisation, choisis <strong>Ouvrir</strong>.</p>
+      <a id="fallbackLink" class="btn" href="#">Continuer sur le web</a>
+      <p class="small" id="debug"></p>
+    </div>
+  </div>
+
+<script>
+(function() {
+  function qs(name){
+    const p = new URLSearchParams(window.location.search);
+    const v = p.get(name);
+    return v ? decodeURIComponent(v) : null;
+  }
+
+  const ua = navigator.userAgent || "";
+  const isAndroid = /Android/i.test(ua);
+  const isIOS = /iPhone|iPad|iPod/i.test(ua);
+
+  // Inputs
+  const appUrl = qs('app'); // e.g. youtube://channel/UCxxx
+  const webUrl = qs('web'); // e.g. https://www.youtube.com/channel/UCxxx
+  const pkg = qs('pkg');    // e.g. com.google.android.youtube (optional)
+
+  // Basic validation
+  const fallback = webUrl || 'https://www.google.com';
+  document.getElementById('fallbackLink').setAttribute('href', fallback);
+
+  // Build Android intent if possible
+  let deeplink = appUrl;
+  if (isAndroid && pkg && fallback) {
+    // Construct an intent:// link using the https fallback path for better compatibility
+    try {
+      const url = new URL(fallback);
+      const path = url.host + url.pathname + (url.search || "");
+      const encFallback = encodeURIComponent(fallback);
+      deeplink = `intent://${path}#Intent;scheme=https;package=${pkg};S.browser_fallback_url=${encFallback};end`;
+    } catch (e) {
+      // fallback to provided appUrl if URL parsing fails
+      deeplink = appUrl || fallback;
+    }
+  }
+
+  // Debug (optional, visible if needed)
+  const dbg = `isAndroid=${isAndroid} isIOS=${isIOS}
+appUrl=${appUrl || '—'}
+webUrl=${fallback}
+pkg=${pkg || '—'}
+deeplink=${deeplink || '—'}`;
+  document.getElementById('debug').textContent = dbg;
+
+  // Try to open as soon as possible (user came here via a tap from IG/TikTok/etc.)
+  function tryOpen() {
+    const start = Date.now();
+    if (deeplink) {
+      // iOS will prompt “Instagram wants to open …”, Android may open directly
+      window.location.href = deeplink;
+    }
+    // Fallback to web if we are still here ~1.1s later
+    setTimeout(function(){
+      if (Date.now() - start < 1600) {
+        window.location.replace(fallback);
+      }
+    }, 1100);
+  }
+
+  if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    tryOpen();
+  } else {
+    document.addEventListener('DOMContentLoaded', tryOpen, { once: true });
+  }
+
+  // If user returns from app (not installed) bring them to web
+  document.addEventListener('visibilitychange', function(){
+    if (!document.hidden) {
+      setTimeout(function(){ location.replace(fallback); }, 600);
+    }
+  });
+})();
+</script>
+</body>
+</html>
