@@ -31,35 +31,111 @@
   <div id="result"></div>
 
 <script>
+/* ------------------------ helpers ------------------------ */
+function normalizeUrl(input, platform) {
+  let s = (input || '').trim();
+
+  // Autoriser juste un handle
+  if (platform === 'youtube') {
+    // youtube: on accepte @handle, handle, ou des URLs
+    if (s.startsWith('@')) s = 'https://youtube.com/' + s;
+    if (!s.includes('youtube.com')) s = 'https://youtube.com/@' + s.replace(/^@+/, '');
+  }
+  if (platform === 'tiktok') {
+    if (s.startsWith('@')) s = 'https://www.tiktok.com/' + s;
+    if (!s.includes('tiktok.com')) s = 'https://www.tiktok.com/@' + s.replace(/^@+/, '');
+  }
+  if (platform === 'spotify') {
+    // laisse l’utilisateur coller l’URL open.spotify.com/...
+    if (!/^https?:\/\//i.test(s)) s = 'https://' + s;
+  }
+
+  // Ajouter https:// si absent
+  if (!/^https?:\/\//i.test(s)) s = 'https://' + s;
+
+  // Normaliser doubles slash après le domaine
+  try {
+    const u = new URL(s);
+    u.pathname = u.pathname.replace(/\/{2,}/g, '/');
+    return u.toString();
+  } catch {
+    return s; // au pire on renvoie brut
+  }
+}
+
+function buildForYouTube(webUrl) {
+  // ex: https://youtube.com/@bastiui  -> app: youtube://www.youtube.com/@bastiui
+  const appUrl = webUrl.replace(/^https?:\/\//, 'youtube://');
+  return {
+    webUrl,
+    pkg: 'com.google.android.youtube',
+    // une seule candidate nécessaire côté iOS
+    appCandidates: [appUrl],
+  };
+}
+
+function buildForTikTok(webUrl) {
+  // Web fallback propre
+  const url = new URL(webUrl);
+  const parts = url.pathname.split('/').filter(Boolean);
+  // handle = @xxx ou xxx
+  let handle = parts[0] || '';
+  if (!handle.startsWith('@')) handle = '@' + handle;
+
+  // iOS : essayer plusieurs schémas historiques
+  const iosCandidates = [
+    `tiktok://user/${handle}`,
+    `tiktok://profile/${handle}`,
+    `snssdk1128://user/profile/${handle}`, // anciens builds
+  ];
+
+  return {
+    webUrl,
+    pkg: 'com.zhiliaoapp.musically',
+    appCandidates: iosCandidates,
+  };
+}
+
+function buildForSpotify(webUrl) {
+  // L’app Spotify supporte spotify:// / spotify:artist:...,
+  // mais un intent Android avec package marche très bien aussi.
+  // On ne tente pas de transformer automatiquement en "spotify:..." ici.
+  return {
+    webUrl,
+    pkg: 'com.spotify.music',
+    appCandidates: [], // on laissera Android intent faire le taf
+  };
+}
+
+/* ------------------------ UI main ------------------------ */
 function generateLink() {
   const platform = document.getElementById('platform').value;
-  const rawUrl = document.getElementById('url').value.trim();
-  if (!rawUrl) { alert('Entre un lien valide'); return; }
+  let rawUrl = document.getElementById('url').value;
+  if (!rawUrl) { alert('Entre un lien ou un handle'); return; }
 
-  let appUrl, webUrl, pkg;
+  const webUrl = normalizeUrl(rawUrl, platform);
+  let cfg;
 
-  if (platform === 'youtube') {
-    appUrl = rawUrl.replace('https://', 'youtube://');
-    webUrl = rawUrl;
-    pkg = 'com.google.android.youtube';
-  }
-  else if (platform === 'tiktok') {
-    appUrl = rawUrl.replace('https://', 'snssdk1128://');
-    webUrl = rawUrl;
-    pkg = 'com.zhiliaoapp.musically';
-  }
-  else if (platform === 'spotify') {
-    appUrl = rawUrl.replace('https://open.', 'spotify:').replace(/\//g, ':');
-    webUrl = rawUrl;
-    pkg = 'com.spotify.music';
-  }
+  if (platform === 'youtube') cfg = buildForYouTube(webUrl);
+  else if (platform === 'tiktok') cfg = buildForTikTok(webUrl);
+  else if (platform === 'spotify') cfg = buildForSpotify(webUrl);
+  else { alert('Plateforme non gérée.'); return; }
 
-  const base = window.location.origin + window.location.pathname.replace('index.html', '') + 'open.html';
-  const link = `${base}?app=${encodeURIComponent(appUrl)}&web=${encodeURIComponent(webUrl)}&pkg=${pkg}`;
-  
-  document.getElementById('result').innerHTML = `<strong>Ton Smart Link :</strong><br><a href="${link}" target="_blank">${link}</a>`;
+  // Base vers ta page de redirection
+  const base = window.location.origin + window.location.pathname.replace(/index\.html?$/,'') + 'open.html';
+
+  // On passe plusieurs "app" possibles pour iOS (open.html va les essayer en série)
+  const params = new URLSearchParams();
+  if (cfg.appCandidates && cfg.appCandidates.length) {
+    for (const a of cfg.appCandidates) params.append('app', a);
+  }
+  params.set('web', cfg.webUrl);
+  if (cfg.pkg) params.set('pkg', cfg.pkg);
+
+  const link = `${base}?${params.toString()}`;
+  document.getElementById('result').innerHTML =
+    `<strong>Ton Smart Link :</strong><br><a href="${link}" target="_blank">${link}</a>`;
 }
 </script>
 </body>
 </html>
-test
