@@ -122,7 +122,7 @@ function generateLink() {
   else { alert('Plateforme non gérée.'); return; }
 
   // Base vers ta page de redirection
-  const base = window.location.origin + window.location.pathname.replace(/index\.html?$/,'') + 'open.html';
+const base = "https://atkalvin.github.io/OpenIn/open.html";
 
   // On passe plusieurs "app" possibles pour iOS (open.html va les essayer en série)
   const params = new URLSearchParams();
