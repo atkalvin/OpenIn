@@ -41,3 +41,5 @@ If you provide `pkg` on Android (e.g. `com.spotify.music`), the page will build 
   - rate limiting, theming, and custom domains.
 
 Enjoy!
+
+https://atkalvin.github.io/OpenIn/
